@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CineVault — ดูหนังออนไลน์</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #080a0f;
+      --surface: #0f1219;
+      --card: #13171f;
+      --border: #1e2530;
+      --gold: #f5c518;
+      --gold-dim: #c9a014;
+      --red: #e63946;
+      --text: #e8eaf0;
+      --muted: #7a8499;
+      --accent: #4fc3f7;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* NOISE TEXTURE */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+    }
+
+    /* NAV */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 2.5rem;
+      height: 64px;
+      background: linear-gradient(to bottom, rgba(8,10,15,0.98) 0%, transparent 100%);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.8rem;
+      letter-spacing: 3px;
+      color: var(--gold);
+      text-shadow: 0 0 30px rgba(245,197,24,0.4);
+    }
+    .logo span { color: var(--text); }
+    .nav-right { display: flex; align-items: center; gap: 1.2rem; }
+    .search-wrap {
+      position: relative;
+      display: flex; align-items: center;
+    }
+    .search-wrap svg {
+      position: absolute; left: 12px;
+      color: var(--muted); pointer-events: none;
+    }
+    #searchInput {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 50px;
+      padding: 0.45rem 1rem 0.45rem 2.5rem;
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.85rem;
+      width: 220px;
+      transition: all 0.3s;
+      outline: none;
+    }
+    #searchInput:focus {
+      border-color: var(--gold-dim);
+      background: rgba(245,197,24,0.05);
+      width: 280px;
+    }
+    #searchInput::placeholder { color: var(--muted); }
+
+    /* WATCHLIST NAV BUTTON */
+    .watchlist-nav-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(245,197,24,0.1);
+      border: 1px solid rgba(245,197,24,0.25);
+      color: var(--gold);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.8rem; font-weight: 600;
+      padding: 6px 14px; border-radius: 50px;
+      cursor: pointer; transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .watchlist-nav-btn:hover { background: rgba(245,197,24,0.2); }
+    #watchlistCount {
+      background: var(--gold); color: #000;
+      font-size: 0.7rem; font-weight: 700;
+      width: 18px; height: 18px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* HERO */
+    .hero {
+      position: relative;
+      height: 90vh; min-height: 560px;
+      display: flex; align-items: flex-end;
+      overflow: hidden;
+    }
+    .hero-slide {
+      position: absolute; inset: 0;
+      opacity: 0; transition: opacity 1s ease;
+    }
+    .hero-slide.active { opacity: 1; }
+    .hero-slide-bg {
+      position: absolute; inset: 0;
+      background-size: cover; background-position: center top;
+      transform: scale(1.05);
+      animation: heroZoom 20s ease-in-out infinite alternate;
+    }
+    @keyframes heroZoom {
+      from { transform: scale(1.05) translateX(0); }
+      to   { transform: scale(1.1) translateX(-1%); }
+    }
+    .hero-slide-bg::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(
+        to right, rgba(8,10,15,0.92) 0%, rgba(8,10,15,0.6) 50%, rgba(8,10,15,0.2) 100%
+      ),
+      linear-gradient(to top, rgba(8,10,15,1) 0%, transparent 50%);
+    }
+
+    .hero-content {
+      position: relative; z-index: 2;
+      padding: 0 2.5rem 5rem;
+      max-width: 580px;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--red);
+      color: #fff; font-size: 0.7rem; font-weight: 600;
+      letter-spacing: 2px; text-transform: uppercase;
+      padding: 4px 12px; border-radius: 4px;
+      margin-bottom: 1rem;
+    }
+    .hero-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(3rem, 7vw, 5.5rem);
+      line-height: 0.95;
+      letter-spacing: 2px;
+      margin-bottom: 1rem;
+      color: #fff;
+    }
+    .hero-meta {
+      display: flex; align-items: center; gap: 1rem;
+      font-size: 0.85rem; color: var(--muted);
+      margin-bottom: 1.2rem;
+    }
+    .hero-meta .star { color: var(--gold); font-size: 1rem; }
+    .hero-meta .rating { color: var(--gold); font-weight: 600; }
+    .hero-desc {
+      font-size: 0.95rem; line-height: 1.7;
+      color: rgba(232,234,240,0.75);
+      margin-bottom: 1.8rem;
+    }
+    .hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; }
+
+    /* HERO DOTS */
+    .hero-dots {
+      position: absolute; bottom: 2rem; right: 2.5rem; z-index: 10;
+      display: flex; gap: 8px;
+    }
+    .hero-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      cursor: pointer; transition: all 0.3s;
+      border: none;
+    }
+    .hero-dot.active { background: var(--gold); width: 24px; border-radius: 4px; }
+
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--gold);
+      color: #000; font-weight: 700; font-size: 0.9rem;
+      padding: 0.75rem 1.8rem; border-radius: 6px;
+      text-decoration: none; border: none; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary:hover { background: #ffd740; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(245,197,24,0.3); }
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.08);
+      color: var(--text); font-size: 0.9rem;
+      padding: 0.75rem 1.8rem; border-radius: 6px;
+      text-decoration: none; border: 1px solid rgba(255,255,255,0.12); cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,0.14); transform: translateY(-2px); }
+    .btn-watchlist {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.06);
+      color: var(--muted); font-size: 0.9rem;
+      padding: 0.75rem 1.2rem; border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.1); cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-watchlist.in-list { color: var(--gold); border-color: rgba(245,197,24,0.3); background: rgba(245,197,24,0.08); }
+    .btn-watchlist:hover { transform: translateY(-2px); }
+
+    /* TOOLBAR (filters + sort) */
+    .toolbar {
+      position: sticky; top: 64px; z-index: 50;
+      background: rgba(8,10,15,0.95);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    .filters-bar {
+      padding: 0 2.5rem;
+      display: flex; align-items: center; gap: 0.5rem;
+      overflow-x: auto; height: 52px;
+    }
+    .filters-bar::-webkit-scrollbar { display: none; }
+    .filter-btn {
+      flex-shrink: 0;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted); font-family: 'Outfit', sans-serif;
+      font-size: 0.8rem; font-weight: 500;
+      padding: 5px 16px; border-radius: 50px;
+      cursor: pointer; transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .filter-btn:hover, .filter-btn.active {
+      background: var(--gold); color: #000;
+      border-color: var(--gold); font-weight: 600;
+    }
+    .sort-bar {
+      padding: 0 2.5rem 0.6rem;
+      display: flex; align-items: center; gap: 0.75rem;
+      border-top: 1px solid rgba(255,255,255,0.04);
+    }
+    .sort-label { font-size: 0.75rem; color: var(--muted); }
+    .sort-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted); font-family: 'Outfit', sans-serif;
+      font-size: 0.75rem;
+      padding: 4px 12px; border-radius: 4px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .sort-btn:hover, .sort-btn.active {
+      border-color: var(--accent); color: var(--accent);
+    }
+
+    /* SECTIONS */
+    main { position: relative; z-index: 1; }
+    .section { padding: 3rem 2.5rem; }
+    .section-header {
+      display: flex; align-items: baseline; gap: 1rem;
+      margin-bottom: 1.8rem;
+    }
+    .section-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.8rem; letter-spacing: 2px;
+      color: var(--text);
+    }
+    .section-title::after {
+      content: '';
+      display: inline-block; width: 6px; height: 6px;
+      background: var(--gold); border-radius: 50%;
+      margin-left: 8px; vertical-align: middle;
+    }
+    .count-badge {
+      font-size: 0.8rem; color: var(--muted);
+      background: var(--border); padding: 2px 10px; border-radius: 50px;
+    }
+
+    /* TOP RATED HORIZONTAL SCROLL */
+    .top-rated-scroll {
+      display: flex; gap: 1rem;
+      overflow-x: auto; padding-bottom: 0.5rem;
+    }
+    .top-rated-scroll::-webkit-scrollbar { height: 4px; }
+    .top-rated-scroll::-webkit-scrollbar-track { background: var(--border); border-radius: 2px; }
+    .top-rated-scroll::-webkit-scrollbar-thumb { background: var(--gold-dim); border-radius: 2px; }
+    .top-card {
+      flex-shrink: 0; width: 140px;
+      text-decoration: none; color: inherit;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; overflow: hidden;
+      transition: all 0.3s;
+      position: relative;
+    }
+    .top-card:hover { transform: translateY(-6px); border-color: rgba(245,197,24,0.4); }
+    .top-card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block; }
+    .top-card-rank {
+      position: absolute; top: 8px; left: 8px;
+      font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem;
+      color: var(--gold); text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+      line-height: 1;
+    }
+    .top-card-info { padding: 0.6rem; }
+    .top-card-title { font-size: 0.78rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .top-card-rating { color: var(--gold); font-size: 0.72rem; margin-top: 2px; }
+
+    /* MOVIE GRID */
+    .movie-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 1.2rem;
+    }
+    .movie-card {
+      text-decoration: none; color: inherit;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px; overflow: hidden;
+      transition: all 0.3s;
+      position: relative;
+    }
+    .movie-card:hover { transform: translateY(-6px); border-color: rgba(245,197,24,0.3); box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+    .poster-wrap { position: relative; overflow: hidden; aspect-ratio: 2/3; }
+    .poster-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.5s ease; }
+    .movie-card:hover .poster-wrap img { transform: scale(1.05); }
+    .poster-overlay {
+      position: absolute; inset: 0;
+      background: rgba(8,10,15,0.6);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .movie-card:hover .poster-overlay { opacity: 1; }
+    .play-btn {
+      width: 50px; height: 50px;
+      background: var(--gold); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      transform: scale(0.7); transition: transform 0.3s ease;
+      box-shadow: 0 0 30px rgba(245,197,24,0.5);
+    }
+    .movie-card:hover .play-btn { transform: scale(1); }
+    .play-btn svg { margin-left: 3px; }
+    .rating-badge {
+      position: absolute; top: 8px; right: 8px;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(245,197,24,0.4);
+      color: var(--gold); font-size: 0.75rem; font-weight: 600;
+      padding: 3px 8px; border-radius: 6px;
+      display: flex; align-items: center; gap: 3px;
+    }
+
+    /* WATCHLIST HEART on card */
+    .card-watchlist-btn {
+      position: absolute; top: 8px; left: 8px;
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(0,0,0,0.6); border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity 0.3s, transform 0.2s;
+      color: var(--muted); z-index: 5;
+    }
+    .movie-card:hover .card-watchlist-btn { opacity: 1; }
+    .card-watchlist-btn.in-list { opacity: 1; color: var(--red); }
+    .card-watchlist-btn:hover { transform: scale(1.15); }
+
+    .card-info { padding: 0.8rem; }
+    .card-title {
+      font-size: 0.9rem; font-weight: 600;
+      margin-bottom: 4px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .card-meta {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.75rem; color: var(--muted);
+    }
+    .card-genre {
+      background: rgba(255,255,255,0.06);
+      padding: 2px 8px; border-radius: 4px; font-size: 0.7rem;
+    }
+
+    /* WATCHLIST DRAWER */
+    .drawer-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+      opacity: 0; pointer-events: none; transition: opacity 0.3s;
+    }
+    .drawer-overlay.open { opacity: 1; pointer-events: all; }
+    .drawer {
+      position: fixed; top: 0; right: 0; bottom: 0; z-index: 201;
+      width: 380px; max-width: 95vw;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      transform: translateX(100%); transition: transform 0.4s cubic-bezier(0.4,0,0.2,1);
+      display: flex; flex-direction: column;
+    }
+    .drawer.open { transform: translateX(0); }
+    .drawer-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .drawer-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.5rem; letter-spacing: 2px; color: var(--gold);
+    }
+    .drawer-close {
+      background: none; border: none; color: var(--muted);
+      cursor: pointer; font-size: 1.4rem; line-height: 1;
+      transition: color 0.2s;
+    }
+    .drawer-close:hover { color: var(--text); }
+    .drawer-body {
+      flex: 1; overflow-y: auto; padding: 1rem;
+    }
+    .drawer-body::-webkit-scrollbar { width: 4px; }
+    .drawer-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .watchlist-item {
+      display: flex; gap: 1rem; align-items: center;
+      padding: 0.75rem; border-radius: 8px;
+      background: var(--card); border: 1px solid var(--border);
+      margin-bottom: 0.75rem; text-decoration: none; color: inherit;
+      transition: border-color 0.2s;
+    }
+    .watchlist-item:hover { border-color: rgba(245,197,24,0.3); }
+    .watchlist-item img { width: 52px; aspect-ratio: 2/3; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+    .watchlist-item-info { flex: 1; min-width: 0; }
+    .watchlist-item-title { font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .watchlist-item-meta { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+    .watchlist-remove {
+      background: none; border: none; color: var(--muted);
+      cursor: pointer; font-size: 1.1rem; flex-shrink: 0;
+      transition: color 0.2s;
+    }
+    .watchlist-remove:hover { color: var(--red); }
+    .drawer-empty {
+      text-align: center; padding: 3rem 1rem; color: var(--muted);
+    }
+    .drawer-empty .icon { font-size: 3rem; opacity: 0.3; margin-bottom: 0.75rem; }
+
+    /* EMPTY STATE */
+    .empty-state {
+      text-align: center; padding: 5rem 2rem;
+      color: var(--muted);
+    }
+    .empty-state .big-icon { font-size: 4rem; margin-bottom: 1rem; opacity: 0.4; }
+    .empty-state h3 { font-size: 1.2rem; margin-bottom: 0.5rem; color: var(--text); }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem 2.5rem;
+      text-align: center;
+      color: var(--muted); font-size: 0.8rem;
+    }
+    footer .logo-sm {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.2rem; letter-spacing: 2px; color: var(--gold);
+      margin-bottom: 0.5rem;
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 640px) {
+      nav { padding: 0 1rem; }
+      .hero-content { padding: 0 1rem 4rem; }
+      .section { padding: 2rem 1rem; }
+      .filters-bar, .sort-bar { padding: 0 1rem; }
+      #searchInput { width: 140px; }
+      .watchlist-nav-btn span:not(#watchlistCount) { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">Cine<span>Vault</span></div>
+  <div class="nav-right">
+    <div class="search-wrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input type="text" id="searchInput" placeholder="ค้นหาหนัง..."/>
+    </div>
+    <button class="watchlist-nav-btn" onclick="openDrawer()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+      </svg>
+      <span>Watchlist</span>
+      <span id="watchlistCount">0</span>
+    </button>
+  </div>
+</nav>
+
+<!-- HERO (rotating) -->
+<section class="hero" id="hero">
+  {% for movie in movies[:5] %}
+  <div class="hero-slide {% if loop.first %}active{% endif %}" data-index="{{ loop.index0 }}">
+    <div class="hero-slide-bg" style="background-image: url('{{ movie.backdrop }}')"></div>
+  </div>
+  {% endfor %}
+
+  <div class="hero-content" id="heroContent">
+    <div class="hero-badge">
+      <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
+      แนะนำวันนี้
+    </div>
+    <h1 class="hero-title" id="heroTitle">{{ movies[0].title }}</h1>
+    <div class="hero-meta">
+      <span class="star">★</span>
+      <span class="rating" id="heroRating">{{ movies[0].rating }}</span>
+      <span id="heroYear">{{ movies[0].year }}</span>
+      <span>•</span>
+      <span id="heroGenre">{{ movies[0].genre[0] }}</span>
+      <span>•</span>
+      <span id="heroDuration">{{ movies[0].duration }}</span>
+    </div>
+    <p class="hero-desc" id="heroDesc">{{ movies[0].description }}</p>
+    <div class="hero-actions">
+      <a id="heroLink" href="/movie/{{ movies[0].id }}" class="btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        ดูเลย
+      </a>
+      <button class="btn-watchlist" id="heroWatchlistBtn" onclick="toggleHeroWatchlist()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        </svg>
+        <span id="heroWatchlistText">เพิ่มใน Watchlist</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="hero-dots" id="heroDots">
+    {% for movie in movies[:5] %}
+    <button class="hero-dot {% if loop.first %}active{% endif %}" onclick="goToSlide({{ loop.index0 }})"></button>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="filters-bar" id="filtersBar">
+    <button class="filter-btn active" data-genre="">ทั้งหมด</button>
+    <button class="filter-btn" data-genre="Action">แอ็กชัน</button>
+    <button class="filter-btn" data-genre="Sci-Fi">Sci-Fi</button>
+    <button class="filter-btn" data-genre="Drama">ดราม่า</button>
+    <button class="filter-btn" data-genre="Thriller">ระทึกขวัญ</button>
+    <button class="filter-btn" data-genre="Crime">อาชญากรรม</button>
+    <button class="filter-btn" data-genre="Adventure">ผจญภัย</button>
+    <button class="filter-btn" data-genre="Animation">แอนิเมชัน</button>
+    <button class="filter-btn" data-genre="Comedy">คอมเมดี้</button>
+    <button class="filter-btn" data-genre="Romance">โรแมนติก</button>
+    <button class="filter-btn" data-genre="History">ประวัติศาสตร์</button>
+    <button class="filter-btn" data-genre="Music">ดนตรี</button>
+  </div>
+  <div class="sort-bar">
+    <span class="sort-label">เรียงตาม:</span>
+    <button class="sort-btn active" data-sort="">ค่าเริ่มต้น</button>
+    <button class="sort-btn" data-sort="rating">คะแนนสูงสุด</button>
+    <button class="sort-btn" data-sort="year">ใหม่สุด</button>
+    <button class="sort-btn" data-sort="title">A–Z</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<main>
+  <!-- TOP RATED -->
+  <section class="section" style="padding-bottom: 0;">
+    <div class="section-header">
+      <h2 class="section-title">Top Rated</h2>
+    </div>
+    <div class="top-rated-scroll">
+      {% set sorted_movies = movies | sort(attribute='rating', reverse=True) %}
+      {% for movie in sorted_movies[:10] %}
+      <a href="/movie/{{ movie.id }}" class="top-card">
+        <img src="{{ movie.poster }}" alt="{{ movie.title }}" loading="lazy"/>
+        <div class="top-card-rank">#{{ loop.index }}</div>
+        <div class="top-card-info">
+          <div class="top-card-title">{{ movie.title }}</div>
+          <div class="top-card-rating">★ {{ movie.rating }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- ALL MOVIES -->
+  <section class="section">
+    <div class="section-header">
+      <h2 class="section-title">หนังทั้งหมด</h2>
+      <span class="count-badge" id="movieCount">{{ movies|length }} เรื่อง</span>
+    </div>
+    <div class="movie-grid" id="movieGrid">
+      {% for movie in movies %}
+      <a href="/movie/{{ movie.id }}" class="movie-card"
+         data-genres="{{ movie.genre | join(',') }}"
+         data-rating="{{ movie.rating }}"
+         data-year="{{ movie.year }}"
+         data-title="{{ movie.title }}"
+         data-id="{{ movie.id }}"
+         data-poster="{{ movie.poster }}">
+        <button class="card-watchlist-btn" onclick="toggleWatchlist(event, {{ movie.id }}, '{{ movie.title }}', '{{ movie.poster }}', {{ movie.rating }}, {{ movie.year }})">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        </button>
+        <div class="poster-wrap">
+          <img src="{{ movie.poster }}" alt="{{ movie.title }}" loading="lazy"/>
+          <div class="poster-overlay">
+            <div class="play-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="#000"><path d="M8 5v14l11-7z"/></svg>
+            </div>
+          </div>
+          <div class="rating-badge">★ {{ movie.rating }}</div>
+        </div>
+        <div class="card-info">
+          <div class="card-title">{{ movie.title }}</div>
+          <div class="card-meta">
+            <span>{{ movie.year }}</span>
+            <span class="card-genre">{{ movie.genre[0] }}</span>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <div class="big-icon">🎬</div>
+      <h3>ไม่พบหนัง</h3>
+      <p>ลองค้นหาด้วยคำอื่น หรือเลือกประเภทอื่น</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="logo-sm">CINEVAULT</div>
+  <p>สร้างด้วย Python Flask &amp; ❤️ สำหรับคนรักหนัง · {{ movies|length }} เรื่อง</p>
+</footer>
+
+<!-- WATCHLIST DRAWER -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="watchlistDrawer">
+  <div class="drawer-header">
+    <div class="drawer-title">Watchlist</div>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</div>
+
+<script>
+  // ─── HERO SLIDESHOW ───
+  const heroMovies = [
+    {% for movie in movies[:5] %}
+    { id: {{ movie.id }}, title: "{{ movie.title }}", rating: {{ movie.rating }}, year: {{ movie.year }}, genre: "{{ movie.genre[0] }}", duration: "{{ movie.duration }}", description: {{ movie.description | tojson }} },
+    {% endfor %}
+  ];
+  let currentSlide = 0;
+  let slideTimer;
+
+  function goToSlide(index) {
+    document.querySelectorAll('.hero-slide').forEach((s, i) => s.classList.toggle('active', i === index));
+    document.querySelectorAll('.hero-dot').forEach((d, i) => d.classList.toggle('active', i === index));
+    currentSlide = index;
+    const m = heroMovies[index];
+    document.getElementById('heroTitle').textContent = m.title;
+    document.getElementById('heroRating').textContent = m.rating;
+    document.getElementById('heroYear').textContent = m.year;
+    document.getElementById('heroGenre').textContent = m.genre;
+    document.getElementById('heroDuration').textContent = m.duration;
+    document.getElementById('heroDesc').textContent = m.description;
+    document.getElementById('heroLink').href = '/movie/' + m.id;
+    updateHeroWatchlistBtn();
+    resetSlideTimer();
+  }
+
+  function resetSlideTimer() {
+    clearInterval(slideTimer);
+    slideTimer = setInterval(() => goToSlide((currentSlide + 1) % heroMovies.length), 6000);
+  }
+  resetSlideTimer();
+
+  // ─── WATCHLIST ───
+  function getWatchlist() {
+    try { return JSON.parse(localStorage.getItem('cinevault_watchlist') || '[]'); } catch { return []; }
+  }
+  function saveWatchlist(wl) {
+    localStorage.setItem('cinevault_watchlist', JSON.stringify(wl));
+    updateWatchlistCount();
+    updateCardBtns();
+  }
+  function isInWatchlist(id) { return getWatchlist().some(m => m.id === id); }
+
+  function toggleWatchlist(e, id, title, poster, rating, year) {
+    e.preventDefault(); e.stopPropagation();
+    let wl = getWatchlist();
+    if (isInWatchlist(id)) {
+      wl = wl.filter(m => m.id !== id);
+    } else {
+      wl.push({ id, title, poster, rating, year });
+    }
+    saveWatchlist(wl);
+    updateHeroWatchlistBtn();
+    renderDrawer();
+  }
+
+  function toggleHeroWatchlist() {
+    const m = heroMovies[currentSlide];
+    let wl = getWatchlist();
+    if (isInWatchlist(m.id)) {
+      wl = wl.filter(x => x.id !== m.id);
+    } else {
+      wl.push({ id: m.id, title: m.title, poster: '', rating: m.rating, year: m.year });
+    }
+    saveWatchlist(wl);
+    updateHeroWatchlistBtn();
+    renderDrawer();
+  }
+
+  function updateHeroWatchlistBtn() {
+    const m = heroMovies[currentSlide];
+    const btn = document.getElementById('heroWatchlistBtn');
+    const txt = document.getElementById('heroWatchlistText');
+    const inList = isInWatchlist(m.id);
+    btn.classList.toggle('in-list', inList);
+    txt.textContent = inList ? '✓ อยู่ใน Watchlist' : 'เพิ่มใน Watchlist';
+  }
+
+  function updateWatchlistCount() {
+    document.getElementById('watchlistCount').textContent = getWatchlist().length;
+  }
+
+  function updateCardBtns() {
+    document.querySelectorAll('.card-watchlist-btn').forEach(btn => {
+      const card = btn.closest('.movie-card');
+      const id = parseInt(card.dataset.id);
+      btn.classList.toggle('in-list', isInWatchlist(id));
+    });
+  }
+
+  function openDrawer() { renderDrawer(); document.getElementById('watchlistDrawer').classList.add('open'); document.getElementById('drawerOverlay').classList.add('open'); }
+  function closeDrawer() { document.getElementById('watchlistDrawer').classList.remove('open'); document.getElementById('drawerOverlay').classList.remove('open'); }
+
+  function renderDrawer() {
+    const wl = getWatchlist();
+    const body = document.getElementById('drawerBody');
+    if (!wl.length) {
+      body.innerHTML = '<div class="drawer-empty"><div class="icon">🎬</div><p>ยังไม่มีหนังใน Watchlist</p></div>';
+      return;
+    }
+    body.innerHTML = wl.map(m => `
+      <a href="/movie/${m.id}" class="watchlist-item">
+        <img src="${m.poster || 'https://via.placeholder.com/52x78/13171f/f5c518?text=?'}" alt="${m.title}" onerror="this.src='https://via.placeholder.com/52x78/13171f/f5c518?text=?'"/>
+        <div class="watchlist-item-info">
+          <div class="watchlist-item-title">${m.title}</div>
+          <div class="watchlist-item-meta">★ ${m.rating} · ${m.year}</div>
+        </div>
+        <button class="watchlist-remove" onclick="removeFromWatchlist(event, ${m.id})">✕</button>
+      </a>
+    `).join('');
+  }
+
+  function removeFromWatchlist(e, id) {
+    e.preventDefault(); e.stopPropagation();
+    saveWatchlist(getWatchlist().filter(m => m.id !== id));
+    renderDrawer();
+  }
+
+  // ─── FILTER + SORT ───
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      applyFilterSort();
+    });
+  });
+
+  document.querySelectorAll('.sort-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      applyFilterSort();
+    });
+  });
+
+  let searchTimer;
+  document.getElementById('searchInput').addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(applyFilterSort, 300);
+  });
+
+  function applyFilterSort() {
+    const genre = document.querySelector('.filter-btn.active').dataset.genre;
+    const sort = document.querySelector('.sort-btn.active').dataset.sort;
+    const q = document.getElementById('searchInput').value.toLowerCase().trim();
+
+    let cards = Array.from(document.querySelectorAll('.movie-card'));
+    cards.forEach(c => c.style.display = 'block');
+
+    let visible = cards.filter(card => {
+      const genres = card.dataset.genres.toLowerCase();
+      const title = card.dataset.title.toLowerCase();
+      const genreMatch = !genre || genres.includes(genre.toLowerCase());
+      const searchMatch = !q || title.includes(q);
+      return genreMatch && searchMatch;
+    });
+
+    cards.forEach(c => {
+      const show = visible.includes(c);
+      c.style.display = show ? 'block' : 'none';
+    });
+
+    // Sort
+    const grid = document.getElementById('movieGrid');
+    if (sort === 'rating') {
+      visible.sort((a, b) => parseFloat(b.dataset.rating) - parseFloat(a.dataset.rating));
+    } else if (sort === 'year') {
+      visible.sort((a, b) => parseInt(b.dataset.year) - parseInt(a.dataset.year));
+    } else if (sort === 'title') {
+      visible.sort((a, b) => a.dataset.title.localeCompare(b.dataset.title));
+    }
+    visible.forEach(c => grid.appendChild(c));
+
+    document.getElementById('movieCount').textContent = visible.length + ' เรื่อง';
+    document.getElementById('emptyState').style.display = visible.length === 0 ? 'block' : 'none';
+  }
+
+  // ─── INIT ───
+  updateWatchlistCount();
+  updateCardBtns();
+  updateHeroWatchlistBtn();
+
+  // Staggered card reveal
+  document.querySelectorAll('.movie-card').forEach((card, i) => {
+    card.style.opacity = '0';
+    card.style.transform = 'translateY(20px)';
+    card.style.transition = `opacity 0.4s ease ${i * 0.04}s, transform 0.4s ease ${i * 0.04}s, box-shadow 0.3s, border-color 0.3s`;
+    setTimeout(() => { card.style.opacity = '1'; card.style.transform = 'translateY(0)'; }, 100 + i * 40);
+  });
+</script>
+</body>
+</html>
